@@ -16,37 +16,38 @@ Schedule / Manual
 
 ## Files
 
-| File | Purpose |
-|---|---|
-| `lead-sniper.workflow.json` | The workflow. Import it into n8n. |
-| `LOGIC_LOG.md` | The logic, and how I handle GitHub rate limits. |
-| `code-nodes/*.js` | Readable source of each Code node |
-| `scripts/build-workflow.mjs` | Regenerates the workflow JSON from those sources (`npm run build`) |
-| `tests/code-nodes.test.mjs` | Unit tests for the Code nodes (`npm test`) |
+|File|Purpose|
+|-|-|
+|`lead-sniper.workflow.json`|The workflow. Import it into n8n.|
+|`LOGIC\_LOG.md`|The logic, and how I handle GitHub rate limits.|
+|`code-nodes/\*.js`|Readable source of each Code node|
+|`scripts/build-workflow.mjs`|Regenerates the workflow JSON from those sources (`npm run build`)|
+|`tests/code-nodes.test.mjs`|Unit tests for the Code nodes (`npm test`)|
 
 ## Setup
 
 1. **Import.** In n8n: Workflows > Import from File > `lead-sniper.workflow.json`.
 2. **GitHub token.** Create a classic token at github.com/settings/tokens (no scopes needed for public data). In n8n add a **Header Auth** credential called `GitHub Token`: name `Authorization`, value `Bearer <token>`. Select it on the four GitHub nodes (Check Rate Limit, Get Repo, Fetch Stargazer Pages, Get User Profile).
 3. **LLM.** The workflow uses Google Gemini (free key from aistudio.google.com). Create the credential and select it on **Gemini Chat Model**. To use another provider, swap that node for the matching chat-model node and connect it to **Generate Sales Pitch**.
-4. **Discord.** Channel settings > Integrations > Webhooks > New Webhook > Copy URL. Paste it into `discord_webhook_url` in the **Config** node.
+4. **Discord.** Channel settings > Integrations > Webhooks > New Webhook > Copy URL. Paste it into `discord\_webhook\_url` in the **Config** node.
 
-   > **Replace `PASTE_DISCORD_WEBHOOK_URL_HERE` with your webhook, and scrub it again before exporting or sharing the workflow.** I kept it as a plain field in Config because n8n has no credential type for a bare webhook URL; reading it from an environment variable is blocked on some n8n installs.
-5. **Repo and thresholds.** Everything is in **Config** (`repo_owner`, `repo_name`, `min_followers`, `min_public_repos`, `max_per_run`, ...).
+> \*\*Replace `PASTE\_DISCORD\_WEBHOOK\_URL\_HERE` with your webhook, and scrub it again before exporting or sharing the workflow.\*\* I kept it as a plain field in Config because n8n has no credential type for a bare webhook URL; reading it from an environment variable is blocked on some n8n installs.
+
+5. **Repo and thresholds.** Everything is in **Config** (`repo\_owner`, `repo\_name`, `min\_followers`, `min\_public\_repos`, `max\_per\_run`, ...).
 6. Run **Manual Test Run**, then activate the workflow for the 15-minute schedule.
 
 ## Design decisions and trade-offs
 
-| Decision | Why | Trade-off |
-|---|---|---|
-| Poll every 15 min instead of a GitHub webhook | Works on any public repo; a repo webhook needs admin rights on the repo | Up to 15 min of delay; uses API quota even when nothing happened |
-| Fetch only the last two stargazer pages | The API is oldest-first with no `since`, so new stars are at the end. Cost stays at ~2 calls however large the repo is. | A burst of 200+ stars between polls could be missed |
-| Watermark in workflow static data (`starred_at` plus logins at that second) | No external database needed; handles same-second stars | Not locked against overlapping runs; moves before delivery (see Logic Log) |
-| `/rate_limit` gate before each run | Free call, one simple comparison, no wasted run | Only protects the start of a run |
-| Per-run cap and request batching | Bounded cost, stays under burst limits | A backlog drains over several polls |
-| Untrusted-data prompt hygiene for bios | A bio is attacker-controlled text going into an LLM | Reduces, but does not eliminate, prompt-injection risk |
-| `allowed_mentions: {parse: []}` on Discord | A bio can't ping `@everyone` | None worth noting |
-| Fallback pitch, flagged in the footer | A dead LLM shouldn't drop a good lead, and I should be able to see it happened | The lead goes out with a generic pitch |
+|Decision|Why|Trade-off|
+|-|-|-|
+|Poll every 15 min instead of a GitHub webhook|Works on any public repo; a repo webhook needs admin rights on the repo|Up to 15 min of delay; uses API quota even when nothing happened|
+|Fetch only the last two stargazer pages|The API is oldest-first with no `since`, so new stars are at the end. Cost stays at \~2 calls however large the repo is.|A burst of 200+ stars between polls could be missed|
+|Watermark in workflow static data (`starred\_at` plus logins at that second)|No external database needed; handles same-second stars|Not locked against overlapping runs; moves before delivery (see Logic Log)|
+|`/rate\_limit` gate before each run|Free call, one simple comparison, no wasted run|Only protects the start of a run|
+|Per-run cap and request batching|Bounded cost, stays under burst limits|A backlog drains over several polls|
+|Untrusted-data prompt hygiene for bios|A bio is attacker-controlled text going into an LLM|Reduces, but does not eliminate, prompt-injection risk|
+|`allowed\_mentions: {parse: \[]}` on Discord|A bio can't ping `@everyone`|None worth noting|
+|Fallback pitch, flagged in the footer|A dead LLM shouldn't drop a good lead, and I should be able to see it happened|The lead goes out with a generic pitch|
 
 ## Testing
 
@@ -54,5 +55,17 @@ The unit tests (`npm test`) run the four Code nodes against stubbed n8n inputs a
 
 The unit tests do not exercise real GitHub, Gemini or Discord. I ran the full workflow in n8n myself:
 
-- Date of live run: `____`
-- Result: `____`
+
+
+Date of live run: `2 Nov 2026`
+
+Result: `The workflow completed successfully in n8n. With the normal thresholds (100 followers / 50 public repositories), my demo lead correctly stopped at the high-value filter. With the thresholds temporarily set to 0 for testing, the workflow generated a sales pitch and successfully posted the lead to Discord.`
+
+
+
+\## Live Discord output
+
+
+
+!\[Discord lead message](docs/discord-message.png)
+
