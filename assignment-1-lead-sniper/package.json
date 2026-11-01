@@ -1,0 +1,9 @@
+{
+  "name": "lead-sniper-n8n",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-workflow.mjs",
+    "test": "node --test tests/code-nodes.test.mjs"
+  }
+}
